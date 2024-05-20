@@ -70,3 +70,58 @@ plt.show()
 print("Original Image:\n", original_image)
 print("Down-sampled Image:\n", downsampled_image)
 print("Up-sampled Image:\n", upsampled_image)
+
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def show_half_pixel_shift(image_path):
+    # Load image
+    image = cv2.imread(image_path, cv2.IMREAD_GRAYSCALE)
+
+    # Downsample the image by a factor of 2
+    downsampled_image = cv2.resize(image, (0, 0), fx=0.5, fy=0.5, interpolation=cv2.INTER_LINEAR)
+
+    # Upsample the image back by a factor of 2
+    upsampled_image = cv2.resize(downsampled_image, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_LINEAR)
+
+    # Plot original, downsampled, and upsampled images
+    plt.figure(figsize=(12, 8))
+
+    plt.subplot(1, 3, 1)
+    plt.title('Original Image')
+    plt.imshow(image, cmap='gray')
+    plt.axis('off')
+
+    plt.subplot(1, 3, 2)
+    plt.title('Downsampled Image')
+    plt.imshow(downsampled_image, cmap='gray')
+    plt.axis('off')
+
+    plt.subplot(1, 3, 3)
+    plt.title('Upsampled Image')
+    plt.imshow(upsampled_image, cmap='gray')
+    plt.axis('off')
+
+    plt.show()
+
+    # Calculate and print pixel value shifts
+    original_center_pixel = image[image.shape[0] // 2, image.shape[1] // 2]
+    upsampled_center_pixel = upsampled_image[image.shape[0] // 2, image.shape[1] // 2]
+
+    print(f'Original center pixel value: {original_center_pixel}')
+    print(f'Upsampled center pixel value: {upsampled_center_pixel}')
+
+    # Difference image
+    difference_image = cv2.absdiff(image, upsampled_image)
+    plt.figure(figsize=(6, 6))
+    plt.title('Difference Image')
+    plt.imshow(difference_image, cmap='gray')
+    plt.axis('off')
+    plt.show()
+
+
+# Example usage
+show_half_pixel_shift('../Misc_14.png')
+
