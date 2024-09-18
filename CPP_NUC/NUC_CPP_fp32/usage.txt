@@ -1,0 +1,13 @@
+python setup.py build_ext --inplace
+
+
+
+import numpy as np
+from nuc_wrapper import py_nuc_correction
+
+# Example usage
+input_image = np.random.randint(0, 65536, (1080, 1920), dtype=np.uint16)
+gain = np.random.uniform(0.9, 1.1, (1080, 1920)).astype(np.float32)
+offset = np.random.uniform(-100, 100, (1080, 1920)).astype(np.float32)
+
+corrected_image = py_nuc_correction(input_image, gain, offset)
