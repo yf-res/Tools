@@ -18,13 +18,13 @@ modified_template = None
 
 # Load pre-trained ResNet model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = models.resnet34(weights=None)  # pretrained=True
-model.load_state_dict(torch.load("pytorch_resnet34.pth"))
+model = models.resnet101(weights='DEFAULT')  # pretrained=True
+# model.load_state_dict(torch.load("pytorch_resnet34.pth"))
 model.to(device)
 model.eval()
 
 # Remove the last fully-connected layer and adaptive average pooling
-model = torch.nn.Sequential(*list(model.children())[:-2])  # can be also -1
+model = torch.nn.Sequential(*list(model.children())[:-1])  # can be also -1
 
 # Image transformation
 # transform = transforms.Compose([
@@ -36,7 +36,7 @@ model = torch.nn.Sequential(*list(model.children())[:-2])  # can be also -1
 
 transform = transforms.Compose([
     transforms.ToTensor(),
-    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
 ])
 
 
@@ -80,7 +80,7 @@ def modify_template(scale, rotation, noise, warp):
 
 
 def extract_features_cpu(img):
-    img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    img = Image.fromarray(img)
     img = transform(img).unsqueeze(0).to(device)
     with torch.no_grad():
         features = model(img)
@@ -88,7 +88,7 @@ def extract_features_cpu(img):
 
 
 def extract_features_gpu(img):
-    img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    img = Image.fromarray(img)
     img = transform(img).unsqueeze(0).to(device)
     with torch.no_grad():
         features = model(img)
@@ -96,7 +96,7 @@ def extract_features_gpu(img):
 
 
 def extract_features_gpu_full(img):
-    img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+    img = Image.fromarray(img)
     img = transform(img).unsqueeze(0).to(device)
     with torch.no_grad():
         features = model(img)
@@ -231,7 +231,7 @@ def find_template(method):
         This implementation should provide a good balance between speed and accuracy for the CNN Feature Matching method.
         """
         # Extract features from the template
-        template_features = extract_features_gpu(modified_template)
+        template_features = extract_features_gpu_full(modified_template)
 
         # Prepare the original image for feature extraction
         h, w = original_image.shape[:2]
@@ -242,22 +242,28 @@ def find_template(method):
         for y in range(0, h - th + 1, 20):  # Step size of 20 for faster processing
             for x in range(0, w - tw + 1, 20):
                 crop = original_image[y:y + th, x:x + tw]
-                crops.append(transform(Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))))
+                crops.append(transform(Image.fromarray(crop)))
 
-        crops_tensor = torch.stack(crops).to(device)
+        crop_features_list = []
+        batch = 100
+        N = len(crops) // batch
+        crops = crops[:batch * N]
+        for i in range(0, len(crops) - 1, N):
+            crops_tensor = torch.stack(crops[i:i + N]).to(device)
+            # Extract features from all crops in a single forward pass
+            with torch.no_grad():
+                crop_features_list.append(model(crops_tensor).squeeze())
 
-        # Extract features from all crops in a single forward pass
-        with torch.no_grad():
-            crop_features = model(crops_tensor).squeeze()
-
+        crop_features = torch.cat(crop_features_list).to(device)
         # Compute similarity scores
-        similarity_scores = torch.nn.functional.cosine_similarity(crop_features, template_features.unsqueeze(0))
+        similarity_scores = torch.nn.functional.cosine_similarity(crop_features, template_features.squeeze())
 
         # Find the best match
         best_score, best_idx = torch.max(similarity_scores, dim=0)
+
         best_y, best_x = divmod(best_idx.item() * 20, w - tw + 1)
 
-        top_left = (best_x, best_y)
+        top_left = (best_x, best_y * 20)
         bottom_right = (top_left[0] + tw, top_left[1] + th)
 
     result_img = original_image.copy()
@@ -271,7 +277,7 @@ def find_template(method):
     zoomed_img = result_img[zoom_top_left[1]:zoom_bottom_right[1], zoom_top_left[0]:zoom_bottom_right[0]]
 
     plt.figure(figsize=(10, 10))
-    plt.imshow(cv2.cvtColor(zoomed_img, cv2.COLOR_BGR2RGB))
+    plt.imshow(zoomed_img)
     plt.axis('off')
     plt.tight_layout()
 
