@@ -18,13 +18,13 @@ modified_template = None
 
 # Load pre-trained ResNet model
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-model = models.resnet34(weights=None)  # pretrained=True
-model.load_state_dict(torch.load("pytorch_resnet34.pth"))
+model = models.resnet50(weights=models.ResNet50_Weights.DEFAULT)  # pretrained=True
+# model.load_state_dict(torch.load("pytorch_resnet34.pth"))
 model.to(device)
 model.eval()
 
 # Remove the last fully-connected layer and adaptive average pooling
-model = torch.nn.Sequential(*list(model.children())[:-2])  # can be also -1
+model = torch.nn.Sequential(*list(model.children())[:-1])  # can be also -1
 
 # Image transformation
 transform = transforms.Compose([
@@ -243,7 +243,7 @@ def find_template(method):
             for x in range(0, w - tw + 1, 20):
                 crop = original_image[y:y + th, x:x + tw]
                 crop = Image.fromarray(cv2.cvtColor(crop, cv2.COLOR_BGR2RGB))
-                crop = transform(crop).unsqueeze(0).to(device)
+                crop = transform(crop).unsqueeze(0)
                 crops.append(crop)
                 indexes.append((y, x))
 
